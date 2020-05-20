@@ -112,13 +112,20 @@ class PostInstallCommand(install):
         self.copy_file(source, target)
 
 
+use_scm_args = {
+    "relative_to": source_dir,
+    "write_to": "semgrep/version.py",
+}
+try:
+    from semgrep.version import version
+
+    use_scm_args["fallback_version"] = version
+except Exception:
+    pass
+
 setup(
     name="semgrep",
-    use_scm_version={
-        "relative_to": source_dir,
-        "write_to": "semgrep/version.py",
-        "fallback_version": "0.8.0b1",
-    },
+    use_scm_version=use_scm_args,
     setup_requires=["setuptools_scm", "setuptools_scm_git_archive"],
     author="Return To Corporation",
     author_email="support@r2c.dev",
