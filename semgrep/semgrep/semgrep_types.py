@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+from typing import Dict
 from typing import List
 from typing import Mapping
 from typing import NamedTuple
@@ -8,6 +9,8 @@ from typing import Optional
 from typing import Set
 
 import attr
+
+from semgrep import rule_lang
 
 PatternId = NewType("PatternId", str)
 Operator = NewType("Operator", str)
@@ -44,6 +47,7 @@ OPERATOR_PATTERN_NAMES_MAP = {
 # These are the only valid top-level keys
 YAML_MUST_HAVE_KEYS = {"id", "message", "languages", "severity"}
 YAML_OPTIONAL_KEYS = {"metadata", "paths"}
+YAML_INTERNAL_KEYS = rule_lang.SPAN_HINTS
 YAML_VALID_TOP_LEVEL_OPERATORS = {
     OPERATORS.AND,
     OPERATORS.AND_ALL,
@@ -60,7 +64,10 @@ YAML_ALL_VALID_RULE_KEYS = (
     }
     | YAML_MUST_HAVE_KEYS
     | YAML_OPTIONAL_KEYS
+    | YAML_INTERNAL_KEYS
 )
+
+YAML_DISPLAY_VALID_RULE_KEYS = YAML_ALL_VALID_RULE_KEYS - YAML_INTERNAL_KEYS
 
 
 class InvalidRuleSchema(BaseException):
@@ -76,6 +83,9 @@ class BooleanRuleExpression:
     children: Optional[List[Any]] = None
     operand: Optional[str] = None
 
+    # For tests, eg. don't force people to make spans
+    provenance: Optional[rule_lang.Span] = None
+
     def __attrs_post_init__(self) -> None:
         self._validate()
 
@@ -87,9 +97,13 @@ class BooleanRuleExpression:
                 )
         else:
             if self.children is not None:
-                raise InvalidRuleSchema(
-                    f"only {pattern_names_for_operators(OPERATORS_WITH_CHILDREN)} operators can have children, but found `{pattern_names_for_operator(self.operator)}` with children"
+                err = rule_lang.RuleLangError(
+                    short_msg=f"{pattern_names_for_operator(self.operator)[0]} cannot have children",
+                    long_msg=f"only {pattern_names_for_operators(OPERATORS_WITH_CHILDREN)} operators can have children",
+                    spans=[self.provenance or rule_lang.DUMMY_SPAN],
+                    level="error",
                 )
+                raise InvalidRuleSchema(err.emit())
 
             if self.operand is None:
                 raise InvalidRuleSchema(
@@ -97,9 +111,13 @@ class BooleanRuleExpression:
                 )
             else:
                 if type(self.operand) != str:
-                    raise InvalidRuleSchema(
-                        f"operand of operators `{pattern_names_for_operator(self.operator)}` must have type string, but is {type(self.operand)}: {self.operand}"
+                    err = rule_lang.RuleLangError(
+                        short_msg="invalid type",
+                        long_msg=f"value for operator `{pattern_names_for_operator(self.operator)[0]}` must be a string, but was {type(self.operand).__name__}",
+                        spans=[self.provenance or rule_lang.DUMMY_SPAN],
+                        level="error",
                     )
+                    raise InvalidRuleSchema(err.emit())
 
 
 def operator_for_pattern_name(pattern_name: str) -> Operator:
@@ -118,9 +136,7 @@ def pattern_names_for_operator(operator: Operator) -> List[str]:
 
 
 def pattern_names_for_operators(operators: List[Operator]) -> List[str]:
-    return sum(
-        (pattern_names_for_operator(op) for op in OPERATOR_PATTERN_NAMES_MAP), []
-    )
+    return sum((pattern_names_for_operator(op) for op in operators), [])
 
 
 class RuleGlobs(NamedTuple):

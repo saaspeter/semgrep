@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html
 ## [0.8.0](https://github.com/returntocorp/semgrep/releases/tag/v0.8.0) - 2020-05-20
 
 ### Added
+- Improved error messages for common yaml rule syntax errors
+- Experimental `--lint` option to check rules against a few issues (currently will warn on equivalent patterns that can be combined)
 - `pattern-regex` functionality - see docs for more information.
 - Ellipsis used in the final position of a sequence of binary operations
   will match any number of additional arguments:

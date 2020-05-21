@@ -6,6 +6,16 @@ from typing import Iterable
 from typing import Optional
 
 from semgrep.pattern_match import PatternMatch
+from semgrep.semgrep_types import YAML_INTERNAL_KEYS
+
+
+def strip_internal_keys(obj: Any) -> Any:
+    if isinstance(obj, list):
+        return [strip_internal_keys(o) for o in obj]
+    elif isinstance(obj, dict):
+        return {k: v for k, v in obj.items() if k not in YAML_INTERNAL_KEYS}
+    else:
+        return obj
 
 
 class RuleMatch:
@@ -19,13 +29,14 @@ class RuleMatch:
         pattern_match: PatternMatch,
         *,
         message: str,
+        # NB: This type isn't validated & for some rules its a List
         metadata: Dict[str, Any],
         severity: str,
         fix: Optional[str],
     ) -> None:
         self._id = id
         self._message = message
-        self._metadata = metadata
+        self._metadata = strip_internal_keys(metadata)
         self._severity = severity
         self._fix = fix
 

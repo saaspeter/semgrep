@@ -1,5 +1,4 @@
 import json
-from collections import namedtuple
 from typing import Any
 from typing import Dict
 from typing import Iterator
@@ -7,6 +6,9 @@ from typing import List
 from typing import Optional
 
 from semgrep.equivalences import Equivalence
+from semgrep.rule_lang import DUMMY_SPAN
+from semgrep.rule_lang import RuleLangError
+from semgrep.rule_lang import Span
 from semgrep.semgrep_types import ALLOWED_GLOB_TYPES
 from semgrep.semgrep_types import BooleanRuleExpression
 from semgrep.semgrep_types import InvalidRuleSchema
@@ -26,28 +28,48 @@ class Rule:
         self._globs = self._build_globs(raw)
 
     def _parse_boolean_expression(
-        self, rule_patterns: List[Dict[str, Any]], pattern_id: int = 0, prefix: str = ""
+        self,
+        rule_patterns: List[Dict[str, Any]],
+        parent: Dict[str, Any],
+        pattern_id: int = 0,
+        prefix: str = "",
     ) -> Iterator[BooleanRuleExpression]:
         """
         Move through the expression from the YML, yielding tuples of (operator, unique-id-for-pattern, pattern)
         """
         if not isinstance(rule_patterns, list):
-            raise InvalidRuleSchema(
-                f"invalid type for patterns in rule: {type(rule_patterns)} is not a list; perhaps your YAML is missing a `-` before {rule_patterns}?"
+            if isinstance(rule_patterns, dict):
+                span = Span.from_dict(rule_patterns, before_context=1)
+            else:
+                span = Span.from_dict(parent)
+
+            err = RuleLangError(
+                short_msg="invalid type for `patterns`",
+                long_msg=f"invalid type for `patterns` (expected list, found {type(rule_patterns).__name__})",
+                level="error",
+                help="perhaps your YAML is missing a `-`?",
+                spans=[span or DUMMY_SPAN],
             )
+            raise InvalidRuleSchema(err.emit())
         for pattern in rule_patterns:
             if not isinstance(pattern, dict):
                 raise InvalidRuleSchema(
                     f"invalid type for pattern {pattern}: {type(pattern)} is not a dict"
                 )
+            span = Span.from_dict(pattern)
             for boolean_operator, pattern_text in pattern.items():
+                if boolean_operator.startswith("__"):
+                    continue
                 operator = operator_for_pattern_name(boolean_operator)
                 if isinstance(pattern_text, list):
                     sub_expression = self._parse_boolean_expression(
-                        pattern_text, 0, f"{prefix}.{pattern_id}"
+                        pattern_text,
+                        parent=pattern,
+                        pattern_id=0,
+                        prefix=f"{prefix}.{pattern_id}",
                     )
                     yield BooleanRuleExpression(
-                        operator, None, list(sub_expression), None
+                        operator, None, list(sub_expression), None, provenance=span
                     )
                 elif isinstance(pattern_text, str):
                     yield BooleanRuleExpression(
@@ -55,6 +77,7 @@ class Rule:
                         PatternId(f"{prefix}.{pattern_id}"),
                         None,
                         pattern_text,
+                        provenance=span,
                     )
                     pattern_id += 1
                 else:
@@ -69,18 +92,27 @@ class Rule:
         Build a boolean expression from the yml lines in the rule
 
         """
+        span = Span.from_dict(rule_raw)
         for pattern_name in pattern_names_for_operator(OPERATORS.AND):
             pattern = rule_raw.get(pattern_name)
             if pattern:
                 return BooleanRuleExpression(
-                    OPERATORS.AND, rule_raw["id"], None, rule_raw[pattern_name]
+                    OPERATORS.AND,
+                    rule_raw["id"],
+                    None,
+                    rule_raw[pattern_name],
+                    provenance=span,
                 )
 
         for pattern_name in pattern_names_for_operator(OPERATORS.REGEX):
             pattern = rule_raw.get(pattern_name)
             if pattern:
                 return BooleanRuleExpression(
-                    OPERATORS.REGEX, rule_raw["id"], None, rule_raw[pattern_name]
+                    OPERATORS.REGEX,
+                    rule_raw["id"],
+                    None,
+                    rule_raw[pattern_name],
+                    provenance=span,
                 )
 
         for pattern_name in pattern_names_for_operator(OPERATORS.AND_ALL):
@@ -89,8 +121,9 @@ class Rule:
                 return BooleanRuleExpression(
                     OPERATORS.AND_ALL,
                     None,
-                    list(self._parse_boolean_expression(patterns)),
+                    list(self._parse_boolean_expression(patterns, parent=rule_raw)),
                     None,
+                    provenance=span,
                 )
 
         for pattern_name in pattern_names_for_operator(OPERATORS.AND_EITHER):
@@ -99,8 +132,9 @@ class Rule:
                 return BooleanRuleExpression(
                     OPERATORS.AND_EITHER,
                     None,
-                    list(self._parse_boolean_expression(patterns)),
+                    list(self._parse_boolean_expression(patterns, parent=rule_raw)),
                     None,
+                    provenance=span,
                 )
 
         valid_top_level_keys = list(YAML_VALID_TOP_LEVEL_OPERATORS)
@@ -128,6 +162,8 @@ class Rule:
             )
 
         for rule_type, rule in rule_raw.get("paths", {}).items():
+            if rule_type.startswith("__"):
+                continue
             if rule_type not in ALLOWED_GLOB_TYPES:
                 raise InvalidRuleSchema(
                     f"the `paths:` targeting rules must each be one of {ALLOWED_GLOB_TYPES}"
