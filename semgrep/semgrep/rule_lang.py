@@ -63,6 +63,7 @@ class RuleLangError(NamedTuple):
     level: str
     spans: List[Span]
     help: Optional[str] = None
+    internal: Optional[Any] = None
 
     def __str__(self) -> str:
         return self.emit()

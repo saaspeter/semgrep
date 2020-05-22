@@ -16,6 +16,7 @@ from semgrep.constants import SEMGREP_URL
 from semgrep.dump_ast import dump_parsed_ast
 from semgrep.pattern_lints import lint
 from semgrep.rule import Rule
+from semgrep.rule_autofix import autofix
 from semgrep.util import print_error
 from semgrep.util import print_error_exit
 
@@ -273,10 +274,15 @@ def cli() -> None:
             )
             print_error(f"{len(invalid_configs)} were invalid and not linted.")
             for config, raw_data in valid_configs.items():
+                try:
+                    autofix(config)
+                except Exception:
+                    print_error(f'Failed on {config}!')
+                continue
                 for rule_raw in raw_data.get(RULES_KEY):
                     rule = Rule(rule_raw)
                     if rule.languages:
-                        errors = lint(rule.expression, rule.languages[0])
+                        errors = lint(rule.expression, rule.languages[0], rule_raw)
                     else:
                         # ignoring rules with no languages currently.
                         pass

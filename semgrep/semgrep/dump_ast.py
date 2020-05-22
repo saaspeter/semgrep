@@ -1,7 +1,9 @@
 import subprocess
+import sys
 import tempfile
+from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 from typing import Optional
 
 import semgrep.config_resolver
@@ -13,20 +15,24 @@ from semgrep.util import print_error_exit
 
 
 def dump_parsed_ast(
-    to_json: bool, language: str, pattern: Optional[str], targets_str: List[str]
+        to_json: bool, language: str, pattern: Optional[str], targets_str: List[str]
 ) -> None:
     targets = semgrep.config_resolver.resolve_targets(targets_str)
     if pattern is None and len(targets) != 1:
         print_error_exit(
             f"exactly one target file is required with this option (got {targets})"
         )
-    print(parsed_ast(to_json, language, pattern, targets))
+    try:
+        print(parsed_ast(to_json, language, pattern, tuple(targets)))
+    except subprocess.CalledProcessError as ex:
+        print_error(f"error invoking semgrep with:\n\t{' '.join(pattern)}\n{ex}")
+        print_error_exit(f"\n\n{PLEASE_FILE_ISSUE_TEXT}")
 
 
+@lru_cache(maxsize=sys.maxsize)
 def parsed_ast(
-    to_json: bool, language: str, pattern: Optional[str], targets: List[Path]
+        to_json: bool, language: str, pattern: Optional[str], targets: Tuple[Path]
 ) -> str:
-
     with tempfile.NamedTemporaryFile("w") as fout:
         if pattern:
             fout.write(pattern)
@@ -46,7 +52,7 @@ def parsed_ast(
         cmd = [SEMGREP_PATH] + args
         try:
             output = subprocess.check_output(cmd, shell=False)
-        except subprocess.CalledProcessError as ex:
-            print_error(f"error invoking semgrep with:\n\t{' '.join(cmd)}\n{ex}")
-            print_error_exit(f"\n\n{PLEASE_FILE_ISSUE_TEXT}")
-        return output.decode()
+            return output.decode()
+        except subprocess.CalledProcessError:
+            print(f'Failure for pattern ({language}): "{pattern}"')
+            raise

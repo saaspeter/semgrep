@@ -57,14 +57,14 @@ YAML_VALID_TOP_LEVEL_OPERATORS = {
     OPERATORS.REGEX,
 }
 YAML_ALL_VALID_RULE_KEYS = (
-    {
-        pattern_name
-        for op in YAML_VALID_TOP_LEVEL_OPERATORS
-        for pattern_name in OPERATOR_PATTERN_NAMES_MAP[op]
-    }
-    | YAML_MUST_HAVE_KEYS
-    | YAML_OPTIONAL_KEYS
-    | YAML_INTERNAL_KEYS
+        {
+            pattern_name
+            for op in YAML_VALID_TOP_LEVEL_OPERATORS
+            for pattern_name in OPERATOR_PATTERN_NAMES_MAP[op]
+        }
+        | YAML_MUST_HAVE_KEYS
+        | YAML_OPTIONAL_KEYS
+        | YAML_INTERNAL_KEYS
 )
 
 YAML_DISPLAY_VALID_RULE_KEYS = YAML_ALL_VALID_RULE_KEYS - YAML_INTERNAL_KEYS
@@ -83,6 +83,7 @@ class BooleanRuleExpression:
     children: Optional[List[Any]] = None
     operand: Optional[str] = None
 
+    raw: Dict[str, Any] = None
     # For tests, eg. don't force people to make spans
     provenance: Optional[rule_lang.Span] = None
 
@@ -110,7 +111,7 @@ class BooleanRuleExpression:
                     f"operators `{pattern_names_for_operator(self.operator)}` must have operand"
                 )
             else:
-                if type(self.operand) != str:
+                if not isinstance(self.operand, str):
                     err = rule_lang.RuleLangError(
                         short_msg="invalid type",
                         long_msg=f"value for operator `{pattern_names_for_operator(self.operator)[0]}` must be a string, but was {type(self.operand).__name__}",
@@ -170,9 +171,9 @@ class Range(NamedTuple):
 
     def is_enclosing_or_eq(self, other_range: "Range") -> bool:
         return (
-            self.start <= other_range.start
-            and other_range.end <= self.end
-            and self.vars_match(other_range)
+                self.start <= other_range.start
+                and other_range.end <= self.end
+                and self.vars_match(other_range)
         )
 
     def vars_match(self, rhs: "Range") -> bool:
@@ -198,7 +199,7 @@ class Range(NamedTuple):
             return False
 
         return (
-            self.start == other.start
-            and self.end == other.end
-            and self.vars_match(other)
+                self.start == other.start
+                and self.end == other.end
+                and self.vars_match(other)
         )

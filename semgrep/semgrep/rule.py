@@ -69,7 +69,7 @@ class Rule:
                         prefix=f"{prefix}.{pattern_id}",
                     )
                     yield BooleanRuleExpression(
-                        operator, None, list(sub_expression), None, provenance=span
+                        operator, None, list(sub_expression), None, provenance=span, raw=pattern_text
                     )
                 elif isinstance(pattern_text, str):
                     yield BooleanRuleExpression(
@@ -78,6 +78,7 @@ class Rule:
                         None,
                         pattern_text,
                         provenance=span,
+                        raw=pattern
                     )
                     pattern_id += 1
                 else:
@@ -102,6 +103,7 @@ class Rule:
                     None,
                     rule_raw[pattern_name],
                     provenance=span,
+                    raw=pattern
                 )
 
         for pattern_name in pattern_names_for_operator(OPERATORS.REGEX):
@@ -113,6 +115,7 @@ class Rule:
                     None,
                     rule_raw[pattern_name],
                     provenance=span,
+                    raw=pattern
                 )
 
         for pattern_name in pattern_names_for_operator(OPERATORS.AND_ALL):
@@ -124,6 +127,7 @@ class Rule:
                     list(self._parse_boolean_expression(patterns, parent=rule_raw)),
                     None,
                     provenance=span,
+                    raw=patterns,
                 )
 
         for pattern_name in pattern_names_for_operator(OPERATORS.AND_EITHER):
@@ -135,6 +139,7 @@ class Rule:
                     list(self._parse_boolean_expression(patterns, parent=rule_raw)),
                     None,
                     provenance=span,
+                    raw=patterns,
                 )
 
         valid_top_level_keys = list(YAML_VALID_TOP_LEVEL_OPERATORS)

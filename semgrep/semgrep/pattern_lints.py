@@ -22,17 +22,17 @@ class ParsedPattern(NamedTuple):
 
 
 def pattern_to_json(pattern: str, lang: str) -> Dict[str, Any]:
-    # thanks for nothing, mypy
     if not pattern:
         return {}
+    # thanks for nothing, mypy
     obj: Dict[str, Any] = json.loads(
-        parsed_ast(to_json=True, language=lang, pattern=pattern, targets=[])
+        parsed_ast(to_json=True, language=lang, pattern=pattern, targets=())
     )
     return obj
 
 
 def check_equivalent_patterns(
-    pattern_either: BooleanRuleExpression, lang: str
+        pattern_either: BooleanRuleExpression, lang: str
 ) -> List[RuleLangError]:
     equivalent_patterns = []
 
@@ -41,14 +41,14 @@ def check_equivalent_patterns(
         return []
 
     json_patterns = [
-        ParsedPattern(raw=p, parsed=pattern_to_json(pattern=p.operand, lang=lang),)
-        for p in pattern_either.children or []
+        (i, ParsedPattern(raw=p, parsed=pattern_to_json(pattern=p.operand, lang=lang)))
+        for i, p in enumerate(pattern_either.children) or []
     ]
     for pair in itertools.combinations(json_patterns, 2):
-        patterns = pair
-        equivalence = patterns_are_equivalent(patterns[0].parsed, patterns[1].parsed)
+        (li, l), (ri, r) = pair
+        equivalence = patterns_are_equivalent(l.parsed, r.parsed)
         if equivalence != EquivalentPatterns.Different:
-            equivalent_patterns.append((equivalence, patterns))
+            equivalent_patterns.append((equivalence, (l, r), (li, ri)))
     return [
         RuleLangError(
             short_msg="redundant patterns",
@@ -61,8 +61,9 @@ def check_equivalent_patterns(
             help="remove one"
             if equivalence == EquivalentPatterns.ExactMatch
             else "remove the first and delete `return` from the second",
+            internal=(pattern_either, li, ri, equivalence)
         )
-        for (equivalence, p) in equivalent_patterns
+        for (equivalence, p, (li, ri)) in equivalent_patterns
     ]
 
 
@@ -73,7 +74,7 @@ class EquivalentPatterns(Enum):
 
 
 def patterns_are_equivalent(
-    patt1_json: Dict[str, Any], patt2_json: Dict[str, Any]
+        patt1_json: Dict[str, Any], patt2_json: Dict[str, Any]
 ) -> EquivalentPatterns:
     if patt1_json == patt2_json:
         return EquivalentPatterns.ExactMatch
@@ -110,11 +111,11 @@ def assignment_matches_return(expr: Dict[str, Any], ret: Dict[str, Any]) -> bool
 LINTS = {OPERATORS.AND_EITHER: [check_equivalent_patterns]}
 
 
-def lint(rule: BooleanRuleExpression, lang: str) -> List[RuleLangError]:
+def lint(rule: BooleanRuleExpression, lang: str, raw: Dict[str, Any]) -> List[RuleLangError]:
     lint_results: List[RuleLangError] = []
     linters = LINTS.get(rule.operator, [])
     for linter in linters:
         lint_results += linter(rule, lang)
-    for child in rule.children or []:
-        lint_results += lint(child, lang)
+    for (child, raw) in zip(rule.children or [], rule.raw):
+        lint_results += lint(child, lang, raw)
     return lint_results
