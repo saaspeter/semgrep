@@ -1,5 +1,7 @@
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -60,33 +62,34 @@ def xfail_repo(url, *, reason=None):
         "https://github.com/vstinner/pyperf",
         "https://github.com/mysql/mysql-connector-python",
         "https://github.com/Netflix/lemur",
-        xfail_repo("https://github.com/highcharts/highcharts"),
-        xfail_repo(
-            "https://github.com/lodash/lodash",
-            reason="https://github.com/returntocorp/semgrep/issues/580",
-        ),
-        xfail_repo("https://github.com/signalapp/Signal-Desktop"),
-        xfail_repo("https://github.com/opensourceactivismtech/call-power"),
-        xfail_repo("https://github.com/zulip/zulip"),
-        xfail_repo(
-            "https://github.com/home-assistant/home-assistant",
-            reason=(
-                "https://github.com/returntocorp/semgrep/issues/599, "
-                "https://github.com/returntocorp/semgrep/issues/600, "
-                "https://github.com/returntocorp/semgrep/issues/601, "
-                "https://github.com/returntocorp/semgrep/issues/602"
-            ),
-        ),
-        xfail_repo(
-            "https://github.com/apache/incubator-superset",
-            reason=(
-                "https://github.com/returntocorp/semgrep/issues/581, "
-                "https://github.com/returntocorp/semgrep/issues/582"
-            ),
-        ),
+        #xfail_repo("https://github.com/highcharts/highcharts"),
+        #xfail_repo(
+        #    "https://github.com/lodash/lodash",
+        #    reason="https://github.com/returntocorp/semgrep/issues/580",
+        #),
+        #xfail_repo("https://github.com/signalapp/Signal-Desktop"),
+        #xfail_repo("https://github.com/opensourceactivismtech/call-power"),
+        #xfail_repo("https://github.com/zulip/zulip"),
+        #xfail_repo(
+        #    "https://github.com/home-assistant/home-assistant",
+        #    reason=(
+        #        "https://github.com/returntocorp/semgrep/issues/599, "
+        #        "https://github.com/returntocorp/semgrep/issues/600, "
+        #        "https://github.com/returntocorp/semgrep/issues/601, "
+        #        "https://github.com/returntocorp/semgrep/issues/602"
+        #    ),
+        #),
+        #xfail_repo(
+        #    "https://github.com/apache/incubator-superset",
+        #    reason=(
+        #        "https://github.com/returntocorp/semgrep/issues/581, "
+        #        "https://github.com/returntocorp/semgrep/issues/582"
+        #    ),
+        #),
     ],
 )
 def test_semgrep_on_repo(monkeypatch, tmp_path, repo_url):
+    repo_dir = os.getcwd()
     TESTS_PATH = Path(__file__).parent.parent
     monkeypatch.setenv("PYTHONPATH", str(TESTS_PATH.parent.resolve()))
     (tmp_path / "rules").symlink_to(Path(TESTS_PATH / "qa" / "rules").resolve())
@@ -119,17 +122,25 @@ def test_semgrep_on_repo(monkeypatch, tmp_path, repo_url):
                 "python3",
                 "-m",
                 "semgrep",
-                "--pattern",
-                f"$X = {SENTINEL_VALUE}",
-                "--lang",
-                language,
-                "--json",
-                "repo",
+                "--config",
+                "r2c",
+                "--perf-study",
+                "repo"
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             encoding="utf-8",
         )
+
+        repo_name = '-'.join(repo_url.split('/')[-2:])
+        with open(Path(repo_dir) / 'perf-results' / f'{repo_name}.json', 'w') as f:
+            for row in semgrep_run.stdout.splitlines():
+                row = json.loads(row)
+                row['repo'] = repo_url
+                json.dump(row, f)
+                f.write('\n')
+        return
+
 
         assert semgrep_run.returncode == 0
         try:

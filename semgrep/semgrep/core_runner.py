@@ -23,6 +23,7 @@ from semgrep.evaluation import enumerate_patterns_in_boolean_expression
 from semgrep.evaluation import evaluate
 from semgrep.pattern import Pattern
 from semgrep.pattern_match import PatternMatch
+from semgrep.perf import Tracker
 from semgrep.rule import Rule
 from semgrep.rule_match import RuleMatch
 from semgrep.semgrep_types import BooleanRuleExpression
@@ -159,6 +160,7 @@ class CoreRunner:
         """
         See format_output_exception in semgrep O'Caml for details on schema
         """
+        raise Exception(json.dumps(error_json))
         error_type = error_json["error"]
         if error_type == "invalid language":
             print_error_exit(f'invalid language {error_json["language"]}')
@@ -270,6 +272,7 @@ class CoreRunner:
                 with tempfile.NamedTemporaryFile("w") as fout:
                     fout.write(yaml_as_str)
                     fout.flush()
+                    #print(f'rules length: {len(yaml_as_str)}')
                     cmd = [SEMGREP_PATH] + [
                         "-lang",
                         language,
@@ -283,7 +286,11 @@ class CoreRunner:
                     cmd += [*self.targeting_options, *[str(path) for path in targets]]
 
                     try:
+                        #print('waiting...',end='')
+                        t1 = datetime.now()
                         output = subprocess.check_output(cmd, shell=False)
+                        t2 = datetime.now()
+                        #print(f'done. chars_per_milli: {len(yaml_as_str) / ((t2 - t1).total_seconds() * 1000)}')
                     except subprocess.CalledProcessError as ex:
                         try:
                             # see if semgrep output a JSON error that we can decode
@@ -297,12 +304,13 @@ class CoreRunner:
                                 print_error(
                                     f"unexpected non-json output while invoking semgrep core with {' '.join(cmd)} \n {ex}"
                                 )
-                                print_error_exit(f"\n{PLEASE_FILE_ISSUE_TEXT}")
+                                #print_error_exit(f"\n{PLEASE_FILE_ISSUE_TEXT}")
                                 raise ex  # let our general exception handler take care of this
                         except Exception as e:
                             print_error(
                                 f"non-zero return code while invoking semgrep with:\n\t{' '.join(cmd)}\n{ex} {e}"
                             )
+                            raise
                             print_error_exit(f"\n\n{PLEASE_FILE_ISSUE_TEXT}")
                     output_json = json.loads((output.decode("utf-8", "replace")))
                     errors.extend(output_json["errors"])
@@ -368,6 +376,8 @@ class CoreRunner:
         findings_by_rule = self._resolve_output(outputs)
 
         debug_print(f"semgrep ran in {datetime.now() - start}")
+
+        Tracker.record(datetime.now() - start, file=str(targets[0]), rule=rules[0].id)
 
         return findings_by_rule, errors
 

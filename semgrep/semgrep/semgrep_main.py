@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -6,6 +7,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+from tqdm import tqdm
 import semgrep.config_resolver
 from semgrep.autofix import apply_fixes
 from semgrep.constants import DEFAULT_CONFIG_FILE
@@ -14,6 +16,7 @@ from semgrep.constants import OutputFormat
 from semgrep.constants import RULES_KEY
 from semgrep.core_runner import CoreRunner
 from semgrep.output import build_output
+from semgrep.perf import Tracker
 from semgrep.rule import Rule
 from semgrep.rule_match import RuleMatch
 from semgrep.semgrep_types import InvalidRuleSchema
@@ -206,6 +209,16 @@ def should_exclude_this_path(path: Path) -> bool:
     """
     return any("test" in p or "example" in p for p in path.parts)
 
+def all_files(path: Path, extension: Optional[str]):
+    for r, d, f in os.walk(path):
+        for file in f:
+            if extension is None or extension in file:
+                yield os.path.join(r, file)
+
+
+def chunked(seq, chunk_size):
+    return (seq[pos:pos + chunk_size] for pos in range(0, len(seq), chunk_size))
+
 
 def main(
     target: List[str],
@@ -228,6 +241,7 @@ def main(
     exit_on_error: bool,
     autofix: bool,
     dangerously_allow_arbitrary_code_execution_from_rules: bool,
+    perf_study: bool,
 ) -> str:
     # get the proper paths for targets i.e. handle base path of /home/repo when it exists in docker
     targets = semgrep.config_resolver.resolve_targets(target)
@@ -273,15 +287,39 @@ def main(
             )
 
     # actually invoke semgrep
-    rule_matches_by_rule, semgrep_errors = CoreRunner(
+    runner = CoreRunner(
         allow_exec=dangerously_allow_arbitrary_code_execution_from_rules,
         jobs=jobs,
         exclude=exclude,
         include=include,
         exclude_dir=exclude_dir,
         include_dir=include_dir,
-    ).invoke_semgrep(targets, all_rules)
+    )
+    if not perf_study:
+        rule_matches_by_rule, semgrep_errors = runner.invoke_semgrep(targets, all_rules)
+    else:
+        with open('empty.txt', 'w') as f:
+            f.write('')
+        files_to_analyze = [f for target in targets for f in all_files(target, None)]
+        print_error(f'Performing performance study of {len(all_rules)} over {len(files_to_analyze)} files')
+        #runner.invoke_semgrep(['empty.txt'], all_rules)
+        print_error(f'Computing baseline for rules...')
+        for rule in all_rules:
+            runner.invoke_semgrep(['empty.txt'], [rule])
+        Tracker.mark_baseline()
 
+        Tracker.dump(sys.stdout)
+        for rule in all_rules:
+            try:
+                rule_matches, semgrep_errors = runner.invoke_semgrep(target, [rule])
+            except Exception:
+                print_error(f'Failure for {target} {rule.id}')
+        Tracker.dump(sys.stdout)
+
+        print_error('Analysis done! Goodbye.')
+        exit(0)
+
+    Tracker.dump(sys.stdout)
     if exclude_tests:
         ignored_in_tests = 0
         filtered_findings_by_rule = {}

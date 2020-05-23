@@ -60,6 +60,8 @@ def cli() -> None:
         ),
     )
 
+    config.add_argument('--perf-study', action='store_true', help='Use leave-one-out to compute perf metrics for rules and files')
+
     config_ex.add_argument(
         "-e",
         "--pattern",
@@ -284,6 +286,7 @@ def cli() -> None:
                 exit_on_error=args.error,
                 autofix=args.autofix,
                 dangerously_allow_arbitrary_code_execution_from_rules=args.dangerously_allow_arbitrary_code_execution_from_rules,
+                perf_study=args.perf_study
             )
     except NotImplementedError as ex:
         print_error_exit(

@@ -9,9 +9,11 @@ wheel = "*"
 tox = "*"
 pytest-snapshot = "*"
 pytest-benchmark = "*"
+pytest-xdist = "*"
 
 [packages]
 semgrep = {editable = true,path = "."}
+tqdm = "*"
 
 [requires]
 python_version = "3.7"
