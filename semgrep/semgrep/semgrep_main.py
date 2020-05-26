@@ -304,14 +304,17 @@ def main(
         print_error(f'Performing performance study of {len(all_rules)} over {len(files_to_analyze)} files')
         #runner.invoke_semgrep(['empty.txt'], all_rules)
         print_error(f'Computing baseline for rules...')
-        for rule in all_rules:
-            runner.invoke_semgrep(['empty.txt'], [rule])
-        Tracker.mark_baseline()
+        #for rule in all_rules:
+        #    runner.invoke_semgrep(['empty.txt'], [rule])
+        #Tracker.mark_baseline()
 
         Tracker.dump(sys.stdout)
         for rule in all_rules:
             try:
-                rule_matches, semgrep_errors = runner.invoke_semgrep(target, [rule])
+                print_error(f'running {rule.id}')
+                for file in files_to_analyze:
+                    rule_matches, semgrep_errors = runner.invoke_semgrep([file], [rule])
+                    Tracker.dump(sys.stdout)
             except Exception:
                 print_error(f'Failure for {target} {rule.id}')
         Tracker.dump(sys.stdout)

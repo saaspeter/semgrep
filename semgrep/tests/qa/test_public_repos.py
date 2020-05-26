@@ -92,6 +92,7 @@ def test_semgrep_on_repo(monkeypatch, tmp_path, repo_url):
     repo_dir = os.getcwd()
     TESTS_PATH = Path(__file__).parent.parent
     monkeypatch.setenv("PYTHONPATH", str(TESTS_PATH.parent.resolve()))
+    os.system('which semgrep-core')
     (tmp_path / "rules").symlink_to(Path(TESTS_PATH / "qa" / "rules").resolve())
     monkeypatch.chdir(tmp_path)
 
@@ -100,7 +101,7 @@ def test_semgrep_on_repo(monkeypatch, tmp_path, repo_url):
             "git",
             "clone",
             "--depth=1",
-            "https://github.com/returntocorp/semgrep-rules",
+            repo_url,
             "repo",
         ]
     )
