@@ -97,7 +97,7 @@ def test_semgrep_on_repo(monkeypatch, tmp_path, repo_url):
             "git",
             "clone",
             "--depth=1",
-            "https://github.com/returntocorp/semgrep-rules",
+            repo_url,
             "repo",
         ]
     )
