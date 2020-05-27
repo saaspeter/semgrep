@@ -312,9 +312,12 @@ def main(
         for rule in all_rules:
             try:
                 print_error(f'running {rule.id}')
-                for file in files_to_analyze:
-                    rule_matches, semgrep_errors = runner.invoke_semgrep([file], [rule])
-                    Tracker.dump(sys.stdout)
+                #for file in files_to_analyze:
+                #    rule_matches, semgrep_errors = runner.invoke_semgrep([file], [rule])
+                #    Tracker.dump(sys.stdout)
+                rule_matches, semgrep_errors = runner.invoke_semgrep(targets, [rule])
+                Tracker.dump(sys.stdout)
+
             except Exception:
                 print_error(f'Failure for {target} {rule.id}')
         Tracker.dump(sys.stdout)
