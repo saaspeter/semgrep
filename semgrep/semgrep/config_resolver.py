@@ -9,6 +9,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+from ruamel.yaml import YAML
+
 from semgrep.constants import DEFAULT_CONFIG_FILE
 from semgrep.constants import DEFAULT_CONFIG_FOLDER
 from semgrep.constants import DEFAULT_SEMGREP_CONFIG_NAME
@@ -97,10 +99,11 @@ def parse_config_at_path(
 def parse_config_string(
     config_id: str, contents: str
 ) -> Dict[str, Optional[Dict[str, Any]]]:
-    import yaml  # here for faster startup times
+
+    yaml = YAML(typ="rt")
 
     try:
-        return {config_id: yaml.safe_load(contents)}
+        return {config_id: yaml.load(contents)}
     except yaml.parser.ParserError as se:
         print_error(f"Invalid yaml file {config_id}:\n{indent(str(se))}")
         return {config_id: None}

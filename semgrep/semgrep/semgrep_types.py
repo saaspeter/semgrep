@@ -96,7 +96,7 @@ class BooleanRuleExpression:
                     f"operators `{pattern_names_for_operator(self.operator)}` must have operand"
                 )
             else:
-                if type(self.operand) != str:
+                if not isinstance(self.operand, str):
                     raise InvalidRuleSchema(
                         f"operand of operators `{pattern_names_for_operator(self.operator)}` must have type string, but is {type(self.operand)}: {self.operand}"
                     )

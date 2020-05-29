@@ -16,6 +16,8 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+from ruamel.yaml import YAML
+
 from semgrep.constants import PLEASE_FILE_ISSUE_TEXT
 from semgrep.constants import SEMGREP_PATH
 from semgrep.equivalences import Equivalence
@@ -190,14 +192,8 @@ class CoreRunner:
         return equivalences
 
     def _write_equivalences_file(self, fp: IO, equivalences: List[Equivalence]) -> None:
-        # I don't even know why this is a thing.
-        # cf. https://stackoverflow.com/questions/51272814/python-yaml-dumping-pointer-references
-        import yaml  # here for faster startup times
-
-        yaml.SafeDumper.ignore_aliases = (  # type: ignore
-            lambda *args: True
-        )
-        fp.write(yaml.safe_dump({"equivalences": [e.to_json() for e in equivalences]}))
+        yaml = YAML()
+        yaml.dump({"equivalences": [e.to_json() for e in equivalences]}, stream=fp)
         fp.flush()
 
     def _run_rules(
@@ -206,8 +202,6 @@ class CoreRunner:
         """
             Run all rules on targets and return list of all places that match patterns, ... todo errors
         """
-        import yaml  # here for faster startup times
-
         outputs: List[PatternMatch] = []  # multiple invocations per language
         errors: List[Any] = []
 
@@ -220,6 +214,7 @@ class CoreRunner:
         #  `( )_ )/
         #   <_  <_ sb/dwb
         equivalences = self._flatten_all_equivalences(rules)
+        yaml = YAML()
         with tempfile.NamedTemporaryFile("w") as equiv_fout:
 
             if equivalences:
@@ -266,9 +261,8 @@ class CoreRunner:
 
                 patterns_json = [p.to_json() for p in patterns]
                 # very important not to sort keys here
-                yaml_as_str = yaml.safe_dump({"rules": patterns_json}, sort_keys=False)
                 with tempfile.NamedTemporaryFile("w") as fout:
-                    fout.write(yaml_as_str)
+                    yaml.dump({"rules": patterns_json}, stream=fout)
                     fout.flush()
                     cmd = [SEMGREP_PATH] + [
                         "-lang",

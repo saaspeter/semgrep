@@ -23,6 +23,7 @@ def chdir(dirname=None):
 # TODO: what is the minimum OSX version?
 MIN_OSX_VERSION = "10_14"
 
+
 # from https://stackoverflow.com/questions/45150304/how-to-force-a-python-wheel-to-be-platform-specific-when-building-it # noqa
 class bdist_wheel(_bdist_wheel):
     def finalize_options(self):
@@ -62,6 +63,7 @@ except FileNotFoundError:
 
 source_dir = os.path.dirname(os.path.abspath(__file__))
 repo_root = os.path.dirname(source_dir)
+
 
 # Lifted with love (and edits) from https://github.com/benfred/py-spy/blob/master/setup.py
 class PostInstallCommand(install):
@@ -123,7 +125,7 @@ setup(
     url="https://github.com/returntocorp/semgrep",
     install_requires=[
         "colorama>=0.4.3",
-        "pyyaml>=5.3",
+        "ruamel.yaml==0.16.10",  # exactly pinned because there may be breaking changes
         "requests>=2.22.0",
         "attrs>=19.3.0",
     ],
