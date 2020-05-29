@@ -8,7 +8,7 @@ from typing import Set
 
 from semgrep.constants import RCE_RULE_FLAG
 from semgrep.pattern_match import PatternMatch
-from semgrep.rule import Rule
+from semgrep.rule_lang.rule import Rule
 from semgrep.rule_match import RuleMatch
 from semgrep.semgrep_types import BooleanRuleExpression
 from semgrep.semgrep_types import OPERATORS

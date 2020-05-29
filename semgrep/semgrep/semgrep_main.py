@@ -14,7 +14,7 @@ from semgrep.constants import OutputFormat
 from semgrep.constants import RULES_KEY
 from semgrep.core_runner import CoreRunner
 from semgrep.output import build_output
-from semgrep.rule import Rule
+from semgrep.rule_lang.rule import Rule
 from semgrep.rule_match import RuleMatch
 from semgrep.semgrep_types import InvalidRuleSchema
 from semgrep.semgrep_types import YAML_ALL_VALID_RULE_KEYS

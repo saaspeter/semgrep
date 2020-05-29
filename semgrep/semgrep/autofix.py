@@ -3,7 +3,7 @@ from typing import Dict
 from typing import List
 from typing import Set
 
-from semgrep.rule import Rule
+from semgrep.rule_lang.rule import Rule
 from semgrep.rule_match import RuleMatch
 from semgrep.util import print_error_exit
 from semgrep.util import print_msg

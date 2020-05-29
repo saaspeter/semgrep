@@ -11,7 +11,7 @@ from semgrep.constants import RCE_RULE_FLAG
 from semgrep.evaluation import enumerate_patterns_in_boolean_expression
 from semgrep.evaluation import evaluate_expression as raw_evaluate_expression
 from semgrep.pattern_match import PatternMatch
-from semgrep.rule import Rule
+from semgrep.rule_lang.rule import Rule
 from semgrep.semgrep_types import BooleanRuleExpression
 from semgrep.semgrep_types import Operator
 from semgrep.semgrep_types import OPERATORS

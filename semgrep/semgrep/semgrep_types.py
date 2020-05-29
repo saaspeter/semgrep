@@ -73,10 +73,13 @@ class BooleanRuleExpression:
     pattern_id: Optional[PatternId] = None
     # This is a recursive member but mypy is a half-baked dumpster fire.
     # https://github.com/python/mypy/issues/8320
-    children: Optional[List[Any]] = None
+    children: Optional[List["BooleanRuleExpression"]] = None
     operand: Optional[str] = None
 
     def __attrs_post_init__(self) -> None:
+        import pdb
+
+        pdb.set_trace()
         self._validate()
 
     def _validate(self) -> None:

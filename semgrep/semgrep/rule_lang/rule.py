@@ -40,6 +40,10 @@ class Rule:
                     f"invalid type for pattern {pattern}: {type(pattern)} is not a dict"
                 )
             for boolean_operator, pattern_text in pattern.items():
+                pattern.lc
+                import pdb
+
+                pdb.set_trace()
                 operator = operator_for_pattern_name(boolean_operator)
                 if isinstance(pattern_text, list):
                     sub_expression = self._parse_boolean_expression(

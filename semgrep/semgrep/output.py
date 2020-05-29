@@ -9,7 +9,7 @@ import colorama
 
 from semgrep.constants import __VERSION__
 from semgrep.constants import OutputFormat
-from semgrep.rule import Rule
+from semgrep.rule_lang.rule import Rule
 from semgrep.rule_match import RuleMatch
 
 
