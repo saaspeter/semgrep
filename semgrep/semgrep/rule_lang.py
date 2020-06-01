@@ -1,3 +1,4 @@
+from io import StringIO
 from typing import Any
 from typing import Dict
 from typing import List
@@ -5,10 +6,13 @@ from typing import NamedTuple
 from typing import Optional
 
 from colorama import Fore
-
+from ruamel.yaml import Node
+from ruamel.yaml import RoundTripConstructor
+from ruamel.yaml import YAML
 # These keys are injected into the resulting dictionaries to
 # preserve provenance info for the Yaml. We should switch to Ruamel which
 # will support this more cleanly
+
 START_LINE = "__line__"
 END_LINE = "__endline__"
 FILE = "__sourcefile__"
@@ -116,4 +120,77 @@ def parse_yaml_with_spans(contents: str, filename: Optional[str]) -> Dict[str, A
             mapping[RAW] = lines
             return mapping
 
+    parse_ruamel_spans(contents)
+
     return yaml.load(contents, SafeLineLoader)  # type: ignore
+
+
+class Position(NamedTuple):
+    line: int
+    column: int
+
+    def __repr__(self):
+        return f"{self.line}:{self.column}"
+
+
+class _Span(NamedTuple):
+    start: Position
+    end: Position
+
+    @classmethod
+    def from_node(cls, node: Node):
+        start = Position(line=node.start_mark.line, column=node.start_mark.column)
+        end = Position(line=node.end_mark.line, column=node.end_mark.column)
+        return cls(start, end)
+
+    def __repr__(self):
+        return f"{self.start}-{self.end}"
+
+
+class Located:
+    def __init__(self, value: Any, span: _Span):
+        self.value = value
+        self.span = span
+
+    def __eq__(self, other):
+        return self.value.__eq__(other)
+
+    def __hash__(self):
+        return self.value.__hash__()
+
+    def __repr__(self):
+        return f"{self.span}: ---> {self.value}"
+
+    def unroll(self):
+        if isinstance(self.value, list):
+            return [x.unroll() for x in self.value]
+        elif isinstance(self.value, dict):
+            return {k.unroll(): v.unroll() for k, v in self.value.items()}
+        elif isinstance(self.value, Located):
+            return self.value.unroll()
+        else:
+            return self.value
+
+
+class SpanPreservingRuamelConstructor(RoundTripConstructor):
+
+    # def construct_scalar(self, node):
+    #    r = super().construct_scalar(node)
+    #    return Located(r, _Span.from_node(node))
+
+    # def construct_mapping(self, node, maptyp, deep=False):  # type: ignore
+    #    r = super().construct_mapping(node, maptyp, deep)
+    #    return Located(r, _Span.from_node(node))
+
+    def construct_object(self, node, deep=False):
+        r = super().construct_object(node, deep)
+        return Located(r, _Span.from_node(node))
+
+
+def parse_ruamel_spans(contents: str):
+    yaml = YAML()
+    yaml.Constructor = SpanPreservingRuamelConstructor
+    data = yaml.load(StringIO(contents))
+    import pdb
+
+    pdb.set_trace()

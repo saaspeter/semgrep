@@ -125,6 +125,7 @@ setup(
     install_requires=[
         "colorama>=0.4.3",
         "pyyaml>=5.3",
+        "ruamel.yaml==0.16.0",
         "requests>=2.22.0",
         "attrs>=19.3.0",
         "glom>=20.5.0",
