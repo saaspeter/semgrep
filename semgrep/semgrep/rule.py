@@ -6,6 +6,7 @@ from typing import List
 from typing import Optional
 
 from semgrep.equivalences import Equivalence
+from semgrep.rule_lang import YamlTree
 from semgrep.semgrep_types import ALLOWED_GLOB_TYPES
 from semgrep.semgrep_types import BooleanRuleExpression
 from semgrep.semgrep_types import InvalidRuleSchema
@@ -20,10 +21,11 @@ from semgrep.semgrep_types import YAML_VALID_TOP_LEVEL_OPERATORS
 
 
 class Rule:
-    def __init__(self, raw: Dict[str, Any]) -> None:
-        self._raw = raw
-        self._expression = self._build_boolean_expression(raw)
-        self._globs = self._build_globs(raw)
+    def __init__(self, raw: YamlTree) -> None:
+        self._raw = raw.unroll()
+        self._tree = raw
+        self._expression = self._build_boolean_expression(self._raw)
+        self._globs = self._build_globs(self._raw)
 
     def _parse_boolean_expression(
         self, rule_patterns: List[Dict[str, Any]], pattern_id: int = 0, prefix: str = ""
@@ -203,7 +205,7 @@ class Rule:
 
     @property
     def raw(self) -> Dict[str, Any]:  # type: ignore
-        return self._raw
+        return self._raw.unroll()
 
     @property
     def expression(self) -> BooleanRuleExpression:
@@ -226,7 +228,7 @@ class Rule:
         ]
 
     @classmethod
-    def from_json(cls, rule_json: Dict[str, Any]) -> "Rule":  # type: ignore
+    def from_json(cls, rule_json: YamlTree) -> "Rule":  # type: ignore
         return cls(rule_json)
 
     def to_json(self) -> Dict[str, Any]:

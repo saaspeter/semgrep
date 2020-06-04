@@ -19,6 +19,7 @@ from semgrep.constants import RULES_KEY
 from semgrep.constants import SEMGREP_USER_AGENT
 from semgrep.constants import YML_EXTENSIONS
 from semgrep.rule_lang import parse_yaml_preserve_spans
+from semgrep.rule_lang import Span
 from semgrep.rule_lang import YamlTree
 from semgrep.util import debug_print
 from semgrep.util import is_url
@@ -40,20 +41,33 @@ RULES_REGISTRY = {
 DEFAULT_REGISTRY_KEY = "r2c"
 
 
-def manual_config(pattern: str, lang: str) -> Dict[str, Any]:
-    # TODO remove when using sgrep -e ... -l ... instead of this hacked config
+def manual_config(pattern: str, lang: str) -> Dict[str, Optional[YamlTree]]:
+    """
+    Produce a config object for the given pattern and lang
+
+    We generate a span for this from the pattern -- errors coming from the pattern produce a nice span. Errors
+    coming from bugs generating this config produce an error saying that there is a bug.
+    """
+    # TODO remove when using semgrep -e ... -l ... instead of this hacked config
+    unshowable_span = parse_yaml_preserve_spans(
+        "Semgrep bug generating manual config", filename=None
+    ).span
+    pattern_tree = parse_yaml_preserve_spans(pattern, filename=None)
     return {
-        "manual": {
-            RULES_KEY: [
-                {
-                    ID_KEY: "-",
-                    "pattern": pattern,
-                    "message": pattern,
-                    "languages": [lang],
-                    "severity": "ERROR",
-                }
-            ]
-        }
+        "manual": YamlTree.wrap(
+            {
+                RULES_KEY: [
+                    {
+                        ID_KEY: "-",
+                        "pattern": pattern_tree,
+                        "message": pattern,
+                        "languages": [lang],
+                        "severity": "ERROR",
+                    }
+                ]
+            },
+            span=unshowable_span,
+        )
     }
 
 

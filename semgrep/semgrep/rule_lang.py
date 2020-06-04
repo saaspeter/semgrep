@@ -1,14 +1,43 @@
+import hashlib
 from io import StringIO
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import NamedTuple
+from typing import NewType
 from typing import Optional
 from typing import Union
 
 from ruamel.yaml import Node
 from ruamel.yaml import RoundTripConstructor
 from ruamel.yaml import YAML
+
+SourceFileHash = NewType("SourceFileHash", str)
+
+
+class SpanBuilder:
+    """
+    Singleton class tracking mapping from filehashes -> file contents to support
+    building error messages from Spans
+    """
+
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SpanBuilder, cls).__new__(cls)
+            cls._instance.sources = {}
+            # Put any initialization here.
+        return cls._instance
+
+    def add_source(self, file_hash: SourceFileHash, source: str):
+        self.sources[file_hash] = source
+
+
+def src_to_hash(contents: Union[str, bytes]) -> SourceFileHash:
+    if isinstance(contents, str):
+        contents = contents.encode("utf-8")
+    return SourceFileHash(hashlib.sha256(contents).hexdigest())
 
 
 class Position(NamedTuple):
@@ -25,7 +54,9 @@ class Span(NamedTuple):
     file: Optional[str]
 
     @classmethod
-    def from_node(cls, node: Node, file: Optional[str]) -> "Span":
+    def from_node(
+        cls, node: Node, src_file_hash: SourceFileHash, file: Optional[str]
+    ) -> "Span":
         start = Position(line=node.start_mark.line, column=node.start_mark.column)
         end = Position(line=node.end_mark.line, column=node.end_mark.column)
         return Span(start=start, end=end, file=file)
@@ -43,6 +74,30 @@ class YamlTree:
     def __init__(self, value: LocatedYamlValue, span: Span):
         self.value = value
         self.span = span
+
+    @classmethod
+    def wrap(cls, value: YamlValue, span: Span) -> "YamlTree":
+        """
+        Wraps a value in a YamlTree and attaches the span everywhere.
+
+        This exists so you can take generate a datastructure from user input, but track all the errors within that
+        datastructure back to the user input
+
+        """
+        if isinstance(value, list):
+            return YamlTree(value=[YamlTree.wrap(x, span) for x in value], span=span)
+        elif isinstance(value, dict):
+            return YamlTree(
+                value={
+                    YamlTree.wrap(k, span): YamlTree.wrap(v, span)
+                    for k, v in value.items()
+                },
+                span=span,
+            )
+        elif isinstance(value, YamlTree):
+            return value
+        else:
+            return YamlTree(value, span)
 
     # __eq__ and _hash__ delegate to value to support `value['a']` working properly.
     # otherwise, since the key is _actually_ a `Located` object you'd need to give the
@@ -76,10 +131,15 @@ def parse_yaml(contents: str) -> Dict[str, Any]:
 
 
 def parse_yaml_preserve_spans(contents: str, filename: Optional[str]) -> YamlTree:
+    file_hash = src_to_hash(contents)
+    SpanBuilder().add_source(file_hash, contents)
+
     class SpanPreservingRuamelConstructor(RoundTripConstructor):
         def construct_object(self, node: Node, deep: bool = False) -> YamlTree:
             r = super().construct_object(node, deep)
-            return YamlTree(r, Span.from_node(node, filename))
+            return YamlTree(
+                r, Span.from_node(node, src_file_hash=file_hash, file=filename)
+            )
 
     yaml = YAML()
     yaml.Constructor = SpanPreservingRuamelConstructor

@@ -32,11 +32,12 @@ from semgrep.util import print_msg
 MISSING_RULE_ID = "no-rule-id"
 
 
-def validate_single_rule(config_id: str, rule: Dict[str, Any]) -> bool:
+def validate_single_rule(config_id: str, rule_yaml: YamlTree) -> Optional[Rule]:
     """
         Validate that a rule dictionary contains all necessary keys
         and can be correctly parsed
     """
+    rule = rule_yaml.value
     rule_id_err_msg = f'{rule.get("id", MISSING_RULE_ID)}'
     rule_keys = set(rule.keys())
     if not rule_keys.issuperset(YAML_MUST_HAVE_KEYS):
@@ -44,29 +45,20 @@ def validate_single_rule(config_id: str, rule: Dict[str, Any]) -> bool:
         print_error(
             f"{config_id} is missing required keys {missing_keys} at rule id {rule_id_err_msg}"
         )
-        return False
+        return None
     if not rule_keys.issubset(YAML_ALL_VALID_RULE_KEYS):
         extra_keys = rule_keys - YAML_ALL_VALID_RULE_KEYS
         print_error(
             f"{config_id} has invalid rule key {extra_keys} at rule id {rule_id_err_msg}, can only have: {YAML_ALL_VALID_RULE_KEYS}"
         )
-        return False
+        return None
     try:
-        _ = Rule.from_json(rule).expression
+        return Rule.from_json(rule_yaml)
     except InvalidRuleSchema as ex:
         print_error(
             f"{config_id}: inside rule id {rule_id_err_msg}, pattern fields can't look like this: {ex}"
         )
-        return False
-    try:
-        _ = Rule.from_json(rule).globs
-    except InvalidRuleSchema as ex:
-        print_error(
-            f"{config_id}: inside rule id {rule_id_err_msg}, path fields can't look like this: {ex}"
-        )
-        return False
-
-    return True
+        return None
 
 
 def validate_configs(
@@ -81,15 +73,12 @@ def validate_configs(
         if not config_yaml_tree:
             errors[config_id] = config_yaml_tree
             continue
-        if isinstance(config_yaml_tree, YamlTree):
-            config_any = config_yaml_tree.unroll()
-        else:
-            config_any = config_yaml_tree
-        if not isinstance(config_any, dict):
+
+        if not isinstance(config_yaml_tree.value, dict):
             print_error(f"{config_id} was not a mapping")
-            errors[config_id] = config_any
+            errors[config_id] = config_yaml_tree.value
             continue
-        config: Dict[str, Any] = config_any
+        config = config_yaml_tree.value
         if RULES_KEY not in config:
             print_error(f"{config_id} is missing `{RULES_KEY}` as top-level key")
             errors[config_id] = config
@@ -97,11 +86,12 @@ def validate_configs(
         rules = config.get(RULES_KEY)
         valid_rules = []
         invalid_rules = []
-        for rule in rules:  # type: ignore
+        for rule in rules.value:  # type: ignore
             if validate_single_rule(config_id, rule):
-                valid_rules.append(rule)
+                # we've validated, no reason to keep all the spans around anymore
+                valid_rules.append(rule.unroll())
             else:
-                invalid_rules.append(rule)
+                invalid_rules.append(rule.unroll())
 
         if invalid_rules:
             errors[config_id] = {**config, "rules": invalid_rules}
@@ -176,6 +166,7 @@ def get_config(generate_config: bool, pattern: str, lang: str, config: str) -> A
     # first check if user asked to generate a config
     if generate_config:
         semgrep.config_resolver.generate_config()
+        sys.exit(0)
 
     # let's check for a pattern
     elif pattern:
