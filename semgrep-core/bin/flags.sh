@@ -1,6 +1,9 @@
 #!/bin/bash
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  echo "( :standard )" > flags.sexp
-else
+
+# Use static linking if platform allows.
+#
+if [[ -e /etc/alpine-release ]]; then
   echo "(-ccopt -static)" > flags.sexp
+else
+  echo "( :standard )" > flags.sexp
 fi
